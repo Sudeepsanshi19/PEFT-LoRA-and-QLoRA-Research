@@ -162,13 +162,6 @@ Estimated runtime:
 3-4 hours on a T4 GPU
 ```
 
-## How to Run
-
-1. Open the notebook in Google Colab.
-2. Select `Runtime > Change runtime type`.
-3. Choose a GPU runtime, preferably T4 or better.
-4. Run the notebook cells from top to bottom.
-
 If the primary Qwen model causes an out-of-memory error, the notebook can fall back to TinyLlama.
 
 ## Project Structure
