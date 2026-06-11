@@ -164,14 +164,6 @@ Estimated runtime:
 
 If the primary Qwen model causes an out-of-memory error, the notebook can fall back to TinyLlama.
 
-## Project Structure
-
-```text
-.
-+-- PEFT_LoRA_QLoRA_Research.ipynb
-+-- README.md
-```
-
 ## Notes
 
 - The notebook requires internet access to download models and the IMDb dataset from Hugging Face.
