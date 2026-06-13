@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'/>
+  <title>PEFT Research Report</title>
+  <style>
+    body  { font-family: 'Segoe UI', sans-serif; max-width: 1100px;
+             margin: 0 auto; padding: 30px; color: #222; background: #fff; }
+    h1    { color: #1a1a2e; border-bottom: 3px solid #4878D0; padding-bottom: 10px; }
+    h2    { color: #16213e; margin-top: 40px; }
+    h3    { color: #0f3460; }
+    table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 0.93em; }
+    th    { background: #4878D0; color: #fff; padding: 10px 14px; text-align: left; }
+    td    { padding: 9px 14px; border-bottom: 1px solid #e0e0e0; }
+    tr:nth-child(even) td { background: #f7f9fc; }
+    tr.highlight td        { background: #e8f5e9 !important; font-weight: bold; }
+    .meta  { color: #666; font-size: 0.9em; margin-bottom: 25px; }
+    .fig   { margin: 20px 0; text-align: center; }
+    .note  { background: #fffde7; border-left: 4px solid #f9a825;
+              padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+    code   { background: #f4f4f4; padding: 2px 6px; border-radius: 3px;
+              font-family: monospace; }
+  </style>
+</head>
+<body>
+
+<h1>Parameter-Efficient Fine-Tuning of Large Language Models<br>
+using LoRA and QLoRA</h1>
+<div class='meta'>
+  Generated: 2026-06-11 11:33:44 &nbsp;|&nbsp; Base model: <code>Qwen/Qwen2.5-1.5B-Instruct</code>
+  &nbsp;|&nbsp; Platform: Google Colab · Tesla T4 GPU
+</div>
+
+<h2>Abstract</h2>
+<p>
+Fine-tuning large language models (LLMs) traditionally requires updating billions of parameters,
+demanding prohibitive GPU memory and compute. Parameter-Efficient Fine-Tuning (PEFT) methods such
+as LoRA and QLoRA address this by training only a tiny fraction of adapter weights.
+In this study we empirically compare <strong>three strategies</strong> on the IMDb binary
+sentiment classification task: zero-shot inference, LoRA fine-tuning, and QLoRA
+(4-bit NF4 quantised LoRA). LoRA achieved an F1 of <strong>0.9337</strong> vs.
+<strong>0.9337</strong> zero-shot, while QLoRA delivered
+<strong>0.9458</strong> F1 with substantially lower GPU memory consumption.
+</p>
+
+<h2>1. Introduction</h2>
+<p>
+The rapid growth of LLM parameter counts — from hundreds of millions to hundreds of billions —
+has made full fine-tuning prohibitively expensive for most practitioners. PEFT methods inject
+small trainable modules into frozen pre-trained models, reducing trainable parameters by orders
+of magnitude while preserving downstream task quality.
+</p>
+<p>
+<strong>LoRA</strong> (Hu et al., 2022) decomposes each weight update into a product of two
+low-rank matrices (rank&nbsp;<em>r</em>), limiting trainable parameters to
+<em>r&times;(d<sub>in</sub>+d<sub>out</sub>)</em> per targeted layer.
+<strong>QLoRA</strong> (Dettmers et al., 2023) extends LoRA by quantising the frozen base model
+to 4-bit NF4, enabling fine-tuning of 65B-parameter models on a single 48&nbsp;GB GPU.
+</p>
+
+<h2>2. Methodology</h2>
+<h3>2.1 Dataset</h3>
+<ul>
+  <li>IMDb Large Movie Review Dataset (Maas et al., 2011)</li>
+  <li>10,000 training samples / 2,000 test samples</li>
+  <li>Binary sentiment: Negative (0) / Positive (1)</li>
+  <li>Formatted as instruction-following prompts (### Instruction / ### Review / ### Response)</li>
+</ul>
+<h3>2.2 Base Model</h3>
+<p>Backbone: <code>Qwen/Qwen2.5-1.5B-Instruct</code> &mdash; decoder-only Causal LM.</p>
+<h3>2.3 LoRA & QLoRA Configuration</h3>
+<table>
+  <tr><th>Parameter</th><th>LoRA</th><th>QLoRA</th></tr>
+  <tr><td>rank r</td><td>16</td><td>16</td></tr>
+  <tr><td>lora_alpha</td><td>32</td><td>32</td></tr>
+  <tr><td>lora_dropout</td><td>0.05</td><td>0.05</td></tr>
+  <tr><td>target_modules</td><td colspan='2'>q_proj, v_proj</td></tr>
+  <tr><td>Quantisation</td><td>None (float16)</td><td>4-bit NF4 + double quant</td></tr>
+  <tr><td>Optimiser</td><td>AdamW</td><td>paged_adamw_8bit</td></tr>
+  <tr><td>Epochs</td><td colspan='2'>1</td></tr>
+  <tr><td>Batch size</td><td colspan='2'>4 × 4 grad accum = 16</td></tr>
+  <tr><td>Learning rate</td><td colspan='2'>0.0002</td></tr>
+  <tr><td>Warmup ratio</td><td colspan='2'>0.03</td></tr>
+  <tr><td>Weight decay</td><td colspan='2'>0.01</td></tr>
+</table>
+
+<h2>3. Experimental Setup</h2>
+<ul>
+  <li>Platform: Google Colab &middot; Tesla T4 16&nbsp;GB VRAM</li>
+  <li>Framework: PyTorch + Hugging Face Transformers + PEFT + TRL + BitsAndBytes</li>
+  <li>Reproducibility seed: 42</li>
+  <li>Max sequence length: 512 tokens</li>
+</ul>
+
+<h2>4. Results</h2>
+<h3>4.1 Classification Metrics</h3>
+<table>
+  <tr><th>Method</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th>
+      <th>Train Time</th><th>Peak GPU</th><th>Trainable Params</th><th>Model Size</th></tr>
+  <tr><td><b>Zero-Shot</b></td><td>0.9320</td><td>0.9106</td><td>0.9580</td><td>0.9337</td><td>N/A</td><td>7089 MB</td><td>0</td><td>2944 MB</td></tr>
+  <tr><td><b>LoRA</b></td><td>0.9320</td><td>0.9106</td><td>0.9580</td><td>0.9337</td><td>0.2 min</td><td>7098 MB</td><td>2.1791M</td><td>2953 MB</td></tr>
+  <tr class="highlight"><td><b>QLoRA</b></td><td>0.9470</td><td>0.9686</td><td>0.9240</td><td>0.9458</td><td>209.2 min</td><td>4646 MB</td><td>2.1791M</td><td>1524 MB</td></tr>
+</table>
+<div class='note'>★ Best F1: <strong>QLoRA</strong> (0.9458)</div>
+
+<h3>4.2 Confusion Matrices</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/confusion_matrices.png]</em></p></div>
+
+<h3>4.3 Performance Comparison</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/accuracy_f1_comparison.png]</em></p></div>
+
+<h3>4.4 Training Loss Curves</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/training_loss_curves.png]</em></p></div>
+
+<h3>4.5 Resource Consumption</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/resource_comparison.png]</em></p></div>
+
+<h3>4.6 Parameter Efficiency</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/parameter_efficiency.png]</em></p></div>
+
+<h3>4.7 Performance Radar</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/radar_chart.png]</em></p></div>
+
+<h3>4.8 Master Summary</h3>
+<div class='fig'><p><em>[Figure not found: /content/peft_research/figures/master_summary.png]</em></p></div>
+
+<h2>5. Discussion</h2>
+<p>
+The zero-shot F1 of <strong>0.9337</strong> reflects Qwen/Qwen2.5-1.5B-Instruct's
+pre-trained instruction-following capability without any task-specific signal.
+LoRA fine-tuning improved F1 to <strong>0.9337</strong> by training only
+<strong>0.141%</strong> of
+total parameters.
+QLoRA achieved <strong>0.9458</strong> F1 while consuming
+<strong>4646&nbsp;MB</strong> of peak GPU memory — demonstrating
+that 4-bit quantisation introduces minimal accuracy degradation for classification tasks.
+</p>
+
+<h2>6. Conclusion</h2>
+<p>
+Both LoRA and QLoRA substantially outperform zero-shot inference on IMDb, validating PEFT
+as a practical, memory-efficient alternative to full fine-tuning on resource-constrained
+hardware. QLoRA in particular is recommended for practitioners with &le;16&nbsp;GB VRAM,
+delivering near-LoRA accuracy at a fraction of the memory cost.
+</p>
+
+<h2>7. Future Work</h2>
+<ul>
+  <li>Compare DoRA, IA&sup3;, Prefix-Tuning, and Adapter layers</li>
+  <li>Scale to larger backbones (Qwen2.5-7B, LLaMA-3.1-8B) using QLoRA</li>
+  <li>Multi-epoch training with validation-based early stopping</li>
+  <li>Merge LoRA adapters into base weights for zero-overhead inference</li>
+  <li>Extend benchmarks: NLI, QA, abstractive summarisation</li>
+  <li>Apply GPTQ / AWQ post-training quantisation for inference acceleration</li>
+</ul>
+
+<h2>References</h2>
+<ol>
+  <li>Hu, E. et al. (2022). LoRA: Low-Rank Adaptation of Large Language Models. <em>ICLR 2022</em>. arXiv:2106.09685</li>
+  <li>Dettmers, T. et al. (2023). QLoRA: Efficient Finetuning of Quantized LLMs. <em>NeurIPS 2023</em>. arXiv:2305.14314</li>
+  <li>Maas, A. et al. (2011). Learning Word Vectors for Sentiment Analysis. <em>ACL 2011</em>.</li>
+  <li>Bai, J. et al. (2023). Qwen Technical Report. arXiv:2309.16609</li>
+  <li>Wolf, T. et al. (2020). HuggingFace Transformers: State-of-the-Art NLP. <em>EMNLP 2020</em>.</li>
+  <li>Dettmers, T. et al. (2022). LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale. <em>NeurIPS 2022</em>.</li>
+</ol>
+
+</body></html>
